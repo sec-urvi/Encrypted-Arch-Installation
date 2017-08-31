@@ -32,7 +32,7 @@ cfdisk /dev/sda
 # Make filesystem for EFI
 mkfs.fat -F32 /dev/sda1
 
-# Create crypted /boot container
+# Create /boot container
 mkfs.ext2 /dev/sda2
 
 # Create crypted LVM with /root and swap
