@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Use on your own risk. This script has not been tested yet.
+
 wifi-menu
 ping google.com
 curl -o /etc/pacman.d/mirrorlist https://www.archlinux.org/mirrorlist/all/                                                                                                                                                                                             
