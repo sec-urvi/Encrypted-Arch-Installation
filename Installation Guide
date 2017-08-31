@@ -1,22 +1,7 @@
-
-
-
-Install Arch Linux with full disk encryption (including /boot) and UEFI.
-
-# Desired layout:
-+---------------+----------------+----------------+----------------+
-|ESP partition: |Boot partition: |Volume 1:       |Volume 2:       |
-|               |                |                |                |
-|/boot/efi      |/boot           |root            |swap            |
-|               |                |                |                |
-|               |                |/dev/vg0/root   |/dev/vg0/swap   |
-|/dev/sda1      |/dev/sda2       +----------------+----------------+
-|unencrypted    |LUKS encrypted  |/dev/sda3 encrypted LVM on LUKS  |
-+---------------+----------------+---------------------------------+
+Install Arch Linux with disk encryption and UEFI.
 
 # Download the archiso image from https://www.archlinux.org/
-# Check md5 and sha1 sums
-md5sum archlinux.iso
+# Check sha1 sums
 sha1sum archlinux.iso
 
 # Copy to a usb-drive
@@ -24,40 +9,31 @@ dd if=archlinux.iso of=/dev/sdX bs=16M && sync
 
 # Insert this flash-drive into PC and boot this image
 
-# Securely wipe drive according this article
-# https://wiki.archlinux.org/index.php/Dm-crypt/Drive_preparation
-
 # Connect to Wi-Fi, skip this if you have wired connection
 wifi-menu
 
 # Test Internet connection
 ping google.com
 
-# Enable network time synchronization
-timedatectl set-ntp true
-                                                                                                                                                                                             
-# Check it                                                                                                                                                                                   
-timedatectl status                                                                                                                                                                           
+# Fetch faster mirrorlist for each country
 curl -o /etc/pacman.d/mirrorlist https://www.archlinux.org/mirrorlist/all/                                                                                                                                                                                             
+
+# Uncomment lines for your specific country to get good download speed
+vim /etc/pacman.d/mirrorlist
+
 # Create partitions                                                                                                                                                                          
-gdisk /dev/sda                                                                                                                                                                               
+cfdisk /dev/sda                                                                                                                                                                               
                                                                                                                                                                                              
-# Use "o" to create GPT table                                                                                                                                                                
-# "n" to create partitions:                                                                                                                                                                  
-# Number  Start (sector)    End (sector)  Size       Code  Name
-#    1            2048         1050623   512.0 MiB   EF00  EFI System
-#    2         1050624         1460223   200.0 MiB   8300  Linux filesystem
-#    3         1460224      1679181823   800.0 GiB   8E00  Linux LVM
-# "w" to write changes
-# "q" to quit
+# Number    Size            Type
+#    1    512.0 MiB     EFI System
+#    2    200.0 MiB     Linux filesystem
+#    3    800.0 GiB     Linux LVM
 
 # Make filesystem for EFI
 mkfs.fat -F32 /dev/sda1
 
 # Create crypted /boot container
-cryptsetup luksFormat /dev/sda2
-cryptsetup open /dev/sda2 cryptboot
-mkfs.ext2 /dev/mapper/cryptboot
+mkfs.ext2 /dev/sda2
 
 # Create crypted LVM with /root and swap
 cryptsetup luksFormat /dev/sda3
@@ -73,7 +49,7 @@ mkswap /dev/mapper/vg0-swap
 swapon /dev/mapper/vg0-swap
 mount /dev/mapper/vg0-root /mnt
 mkdir /mnt/boot
-mount /dev/mapper/cryptboot /mnt/boot
+mount /dev/sda2 /mnt/boot
 mkdir /mnt/boot/efi
 mount /dev/sda1 /mnt/boot/efi
 
@@ -88,13 +64,12 @@ lsblk
 # ├─sdb2           8:34   1    40M  0 part  
 # └─sdb1           8:33   1   797M  0 part  /run/archiso/bootmnt
 # sda              8:0    0 931.5G  0 disk  
-# ├─sda2           8:2    0   200M  0 part  
-# │ └─cryptboot  254:0    0   198M  0 crypt /mnt/boot
+# ├─sda1           8:1    0   512M  0 part  /mnt/boot/efi
+# ├─sda2           8:2    0   200M  0 part  /mnt/boot
 # ├─sda3           8:3    0   800G  0 part  
 # │ └─cryptlvm   254:1    0   800G  0 crypt 
 # │   ├─vg0-swap 254:2    0    16G  0 lvm   [SWAP]
 # │   └─vg0-root 254:3    0   784G  0 lvm   /mnt
-# └─sda1           8:1    0   512M  0 part  /mnt/boot/efi
 
 # Install system
 pacstrap /mnt base base-devel grub-efi-x86_64 vim git efibootmgr dialog wpa_supplicant
@@ -102,31 +77,21 @@ pacstrap /mnt base base-devel grub-efi-x86_64 vim git efibootmgr dialog wpa_supp
 # Generate fstab
 genfstab -pU /mnt >> /mnt/etc/fstab
 
+# This is fix for 
+#/run/lvm/lvmetad.socket: connect failed: No such file or directory
 
-uper simple and useful - thank you for your help.
-
-when running grub-mkconfig I usually experience this error (it's popped up on 2 separate host systems so far):
-
-/run/lvm/lvmetad.socket: connect failed: No such file or directory
-
-To fix this - as per this article:
-
-Drop out of the root environment: exit or (Ctrl - d)
 mkdir /mnt/hostrun/
 mount --bind /run /mnt/hostrun
+
+# Chroot into our newly installed system 
 arch-chroot /mnt /bin/bash
 mkdir /run/lvm
 mount --bind /hostrun/lvm /run/lvm
-Then grub-mkconfig will run without a hitch.
-
-
-# Chroot into our newly installed system 
-arch-chroot /mnt
 
 # Set timezone, hostname...
 ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
 hwclock --systohc --utc
-echo archlinux > /etc/hostname
+echo archlinux > /etc/hostname        # You can use any name instead of "archlinux"
 
 # Configure locales
 echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
@@ -138,40 +103,31 @@ passwd
 
 # Open this file
 vim /etc/mkinitcpio.conf
-# and replace HOOKS="..." with HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
-# use "i" key to edit (insert something), ESC and ":wq" to write changes and quit
+# Edit HOOKS="base ... fsck" with HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
+# Use "i" key to edit (insert something), ESC and ":wq" to write changes and quit
 
 # Regenerate initrd image
 mkinitcpio -p linux
 
 # If you got warnings about missing firmware for wd719x and aic94xx, you can ignore it, with high probability you don't even have this hardware
-# But you can install it from AUR if you actually use it
 
 # Change grub config
 echo "GRUB_ENABLE_CRYPTODISK=y" >> /etc/default/grub
 sed -i "s#^GRUB_CMDLINE_LINUX=.*#GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$(blkid /dev/sda3 -s UUID -o value):lvm resume=/dev/mapper/vg0-swap\"#g" /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg
 
-# If you got errors "/run/lvm/lvmetad.socket: connect failed: No such file or directory", that's OK
-# you can get rid of this errors with some workarounds, but this is not really necessary
-# but in any case DO NOT disable lvmetad! This installation will not work without it
-
 # Install grub
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ArchLinux
 
-# It is necessary for mounting /boot without password request
-dd bs=512 count=8 if=/dev/urandom of=/etc/key
-chmod 400 /etc/key
-cryptsetup luksAddKey /dev/sda2 /etc/key
-echo "cryptboot /dev/sda2 /etc/key luks" >> /etc/crypttab
-
-# Same thing: open LVM without password prompt
+# Mount root without any issue
 dd bs=512 count=8 if=/dev/urandom of=/crypto_keyfile.bin
 chmod 000 /crypto_keyfile.bin
 cryptsetup luksAddKey /dev/sda3 /crypto_keyfile.bin
-sed -i 's\^FILES=.*\FILES="/crypto_keyfile.bin"\g' /etc/mkinitcpio.conf
 mkinitcpio -p linux
 chmod 600 /boot/initramfs-linux*
+
+# If you want to start without password prompt use following line
+#sed -i 's\^FILES=.*\FILES="/crypto_keyfile.bin"\g' /etc/mkinitcpio.conf
 
 # Enable Intel microcode CPU updates (if you use Intel processor, of course)
 pacman -S intel-ucode
@@ -194,12 +150,3 @@ exit
 umount -R /mnt
 swapoff -a
 shutdown now
-
-# For additional security, start PC, login in UEFI menu during boot (in most cases by pressing F2 or DEL)
-# enable Secure boot option, and choose our EFI image as trusted. Path will be something like this:
-# HDD0 -> EFI -> ArchLinux -> grubx64.efi
-
-# Of course, you must protect UEFI menu with password.
-# Choose DIFFERENT password from that you used for encryption, because some lazy manufacturers store this password not securely enough.
-
-# Reboot again, login as user, use sudo for installation all other software you want: drivers, display server, desktop environment, etc...
