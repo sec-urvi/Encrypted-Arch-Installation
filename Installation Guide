@@ -120,11 +120,11 @@ grub-mkconfig -o /boot/grub/grub.cfg
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ArchLinux
 
 # Mount root without any issue
-dd bs=512 count=8 if=/dev/urandom of=/crypto_keyfile.bin
-chmod 000 /crypto_keyfile.bin
-cryptsetup luksAddKey /dev/sda3 /crypto_keyfile.bin
-mkinitcpio -p linux
-chmod 600 /boot/initramfs-linux*
+#dd bs=512 count=8 if=/dev/urandom of=/crypto_keyfile.bin
+#chmod 000 /crypto_keyfile.bin
+#cryptsetup luksAddKey /dev/sda3 /crypto_keyfile.bin
+#mkinitcpio -p linux
+#chmod 600 /boot/initramfs-linux*
 
 # If you want to start without password prompt use following line
 #sed -i 's\^FILES=.*\FILES="/crypto_keyfile.bin"\g' /etc/mkinitcpio.conf
@@ -150,3 +150,41 @@ exit
 umount -R /mnt
 swapoff -a
 shutdown now
+
+
+# Post-installation
+
+# Install oh-my-zsh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+
+##  DO FOLLOWING CHANGES ACCORDING TO YOUR TASTE
+# Change export ZSH=../.oh-my-zsh with export ZSH=$HOME/.oh-my-zsh
+# Change ZSH_THEME=".." to ZSH_THEME="maran"
+# Change plugins=(...) to plugins=(git profiles adb archlinux common-aliases extract golang sudo systemd colorize pip python dircycle history terminitor)
+
+# For dual boot
+pacman -S os-prober 
+os-prober
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# Other necessary packages
+pacman -S opera libreoffice networkmanager network-manager-applet xfce4 xfce4-goodies xf86-video-intel mesa xorg xorg-xinit lightdm lightdm-gtk-greeter
+systemctl enable networkmanager.service
+systemctl start networkmanager.service
+systemctl enable lightdm.service
+systemctl start lightdm.service
+# Change as follow in /etc/lightdm/lightdm.conf
+[Seat:*]
+...
+greeter-session=lightdm-yourgreeter-greeter
+
+# Install pacaur
+# Add following in /etc/pacman.conf
+[archlinuxfr]
+SigLevel = Never
+Server = http://repo.archlinux.fr/$arch
+
+pacman -Sy yaourt
+yaourt -S pacaur
+pacman -Rus yaourt
+# Remove archlinuxfr from /etc/pacman.conf
