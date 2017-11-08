@@ -1,41 +1,50 @@
-Install Arch Linux with disk encryption and UEFI.
+## Install Arch Linux with disk encryption and UEFI.
 
-# Download the archiso image from https://www.archlinux.org/
-# Check sha1 sums
-sha1sum archlinux.iso
+## Download the archiso image from https://www.archlinux.org/
+## Check sha1 sums
+# $ sha1sum archlinux.iso
 
-# Copy to a usb-drive
-dd if=archlinux.iso of=/dev/sdX bs=16M && sync
+## Copy to a usb-drive
+# $ dd if=archlinux.iso of=/dev/sdX bs=16M && sync
 
-# Insert this flash-drive into PC and boot this image
+## Insert this flash-drive into PC and boot this image
 
-# Connect to Wi-Fi, skip this if you have wired connection
-wifi-menu
+## Connect to Wi-Fi, skip this if you have wired connection
+# $ wifi-menu
 
-# Test Internet connection
-ping google.com
+## Test Internet connection
+# $ ping google.com
 
-# Fetch faster mirrorlist for each country
-curl -o /etc/pacman.d/mirrorlist https://www.archlinux.org/mirrorlist/all/                                                                                                                                                                                             
+## Write or fetch faster mirrorlist for your country (These mirrors are for Australia)
+rm -f /etc/pacman.d/mirrorlist
+echo "## Australia" > /etc/pacman.d/mirrorlist
+echo "Server = https://mirror.aarnet.edu.au/pub/archlinux/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
+echo "Server = http://archlinux.mirror.digitalpacific.com.au/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
+echo "Server = http://ftp.iinet.net.au/pub/archlinux/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
+echo "Server = http://mirror.internode.on.net/pub/archlinux/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
+echo "Server = http://archlinux.melbourneitmirror.net/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
+echo "Server = http://ftp.swin.edu.au/archlinux/$repo/os/$arch" >> /etc/pacman.d/mirrorlist
 
-# Uncomment lines for your specific country to get good download speed
-vim /etc/pacman.d/mirrorlist
+# $ curl -o /etc/pacman.d/mirrorlist https://www.archlinux.org/mirrorlist/all/                                                                                                                                                                                          
 
-# Create partitions                                                                                                                                                                          
+## Uncomment lines for your specific country to get good download speed
+# $ vim /etc/pacman.d/mirrorlist
+
+## Create partitions                                                                                                                                                                          
 cfdisk /dev/sda                                                                                                                                                                               
                                                                                                                                                                                              
-# Number    Size            Type
-#    1    512.0 MiB     EFI System
-#    2    200.0 MiB     Linux filesystem
-#    3    800.0 GiB     Linux LVM
+## Number    Size            Type
+##    1    512.0 MiB     EFI System
+##    2    200.0 MiB     Linux filesystem
+##    3    800.0 GiB     Linux LVM
 
-# Make filesystem for EFI
+## Make filesystem for EFI
 mkfs.fat -F32 /dev/sda1
 
-# Create /boot container
+## Create /boot container
 mkfs.ext2 /dev/sda2
 
-# Create crypted LVM with /root and swap
+## Create crypted LVM with /root and swap
 cryptsetup luksFormat /dev/sda3
 cryptsetup open /dev/sda3 cryptlvm
 pvcreate /dev/mapper/cryptlvm
@@ -45,7 +54,7 @@ lvcreate -l 100%FREE vg0 -n root
 mkfs.ext4 /dev/mapper/vg0-root
 mkswap /dev/mapper/vg0-swap
 
-# Mount
+## Mount
 swapon /dev/mapper/vg0-swap
 mount /dev/mapper/vg0-root /mnt
 mkdir /mnt/boot
@@ -53,58 +62,58 @@ mount /dev/sda2 /mnt/boot
 mkdir /mnt/boot/efi
 mount /dev/sda1 /mnt/boot/efi
 
-# Check
+## Check
 lsblk
 
-# You will have something like this:
-#
-# NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
-# loop0            7:0    0 347.9M  1 loop  /run/archiso/sfs/airootfs
-# sdb              8:32   1   3.8G  0 disk  
-# ├─sdb2           8:34   1    40M  0 part  
-# └─sdb1           8:33   1   797M  0 part  /run/archiso/bootmnt
-# sda              8:0    0 931.5G  0 disk  
-# ├─sda1           8:1    0   512M  0 part  /mnt/boot/efi
-# ├─sda2           8:2    0   200M  0 part  /mnt/boot
-# ├─sda3           8:3    0   800G  0 part  
-# │ └─cryptlvm   254:1    0   800G  0 crypt 
-# │   ├─vg0-swap 254:2    0    16G  0 lvm   [SWAP]
-# │   └─vg0-root 254:3    0   784G  0 lvm   /mnt
+## You will have something like this:
 
-# Install system
+## NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
+## loop0            7:0    0 347.9M  1 loop  /run/archiso/sfs/airootfs
+## sdb              8:32   1   3.8G  0 disk  
+## ├─sdb2           8:34   1    40M  0 part  
+## └─sdb1           8:33   1   797M  0 part  /run/archiso/bootmnt
+## sda              8:0    0 931.5G  0 disk  
+## ├─sda1           8:1    0   512M  0 part  /mnt/boot/efi
+## ├─sda2           8:2    0   200M  0 part  /mnt/boot
+## ├─sda3           8:3    0   800G  0 part  
+## │ └─cryptlvm   254:1    0   800G  0 crypt 
+## │   ├─vg0-swap 254:2    0    16G  0 lvm   [SWAP]
+## │   └─vg0-root 254:3    0   784G  0 lvm   /mnt
+
+## Install system
 pacstrap /mnt base base-devel grub-efi-x86_64 vim git efibootmgr dialog wpa_supplicant
 
-# Generate fstab
+## Generate fstab
 genfstab -pU /mnt >> /mnt/etc/fstab
 
-# This is fix for 
-#/run/lvm/lvmetad.socket: connect failed: No such file or directory
+## This is fix for error : /run/lvm/lvmetad.socket: connect failed: No such file or directory
 
 mkdir /mnt/hostrun/
 mount --bind /run /mnt/hostrun
 
-# Chroot into our newly installed system 
+## Chroot into our newly installed system 
 arch-chroot /mnt /bin/bash
 mkdir /run/lvm
 mount --bind /hostrun/lvm /run/lvm
 
-# Set timezone, hostname...
+## Set timezone, hostname...
 ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
 hwclock --systohc --utc
-echo archlinux > /etc/hostname        # You can use any name instead of "archlinux"
+echo Archlinux > /etc/hostname
+echo "127.0.0.1    Archlinux.localdomain     Archlinux" >> /etc/hosts
 
-# Configure locales
+## Configure locales
 echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
 echo LANG=en_US.UTF-8 >> /etc/locale.conf
 
-# Set root password
+## Set root password
 passwd
 
-# Open this file
-vim /etc/mkinitcpio.conf
-# Edit HOOKS="base ... fsck" with HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
-# Use "i" key to edit (insert something), ESC and ":wq" to write changes and quit
+## Open this file
+# $ vim /etc/mkinitcpio.conf
+## Edit HOOKS="base ... fsck" with HOOKS="base udev autodetect modconf block keymap encrypt lvm2 resume filesystems keyboard fsck"
+## Use "i" key to edit (insert something), ESC and ":wq" to write changes and quit
 
 # Regenerate initrd image
 mkinitcpio -p linux
@@ -169,8 +178,8 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 # Other necessary packages
 pacman -S opera libreoffice networkmanager network-manager-applet xfce4 xfce4-goodies xf86-video-intel mesa xorg xorg-xinit lightdm lightdm-gtk-greeter
-systemctl enable networkmanager.service
-systemctl start networkmanager.service
+systemctl enable NetworkManager.service
+systemctl start NetworkManager.service
 systemctl enable lightdm.service
 systemctl start lightdm.service
 # Change as follow in /etc/lightdm/lightdm.conf
